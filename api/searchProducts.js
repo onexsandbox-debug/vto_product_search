@@ -1,48 +1,56 @@
 export default async function handler(req, res) {
   try {
-    const { filters } = req.body || {};
+    const { filters } = req.body;
 
-    if (!filters) {
-      return res.status(400).json({ error: "Filters missing" });
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_KEY = process.env.SUPABASE_KEY;
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({
+        error: "Missing Supabase environment variables"
+      });
     }
 
-    const {
-      name,
-      gender,
-      color,
-      size,
-      minPrice,
-      maxPrice,
-      category
-    } = filters;
+    // Build query dynamically
+    let query = `${SUPABASE_URL}/rest/v1/products?select=*`;
 
-    let query = [];
-
-    if (name) query.push(`name=ilike.*${name}*`);
-    if (gender) query.push(`gender_type=eq.${gender}`);
-    if (color) query.push(`color=ilike.*${color}*`);
-    if (size) query.push(`size=eq.${size}`);
-    if (category) query.push(`category=eq.${category}`);
-    if (minPrice) query.push(`price=gte.${minPrice}`);
-    if (maxPrice) query.push(`price=lte.${maxPrice}`);
-
-    let url = `${process.env.SUPABASE_URL}/rest/v1/products`;
-
-    if (query.length > 0) {
-      url += `?${query.join("&")}&limit=5`;
-    } else {
-      url += `?limit=5`;
+    if (filters.name) {
+      query += `&name=ilike.*${filters.name}*`;
     }
 
-    console.log("URL:", url);
+    if (filters.gender) {
+      query += `&gender_type=eq.${filters.gender}`;
+    }
 
-    // ✅ USE NATIVE FETCH (IMPORTANT)
-    const response = await fetch(url, {
-      method: "GET",
+    if (filters.color) {
+      query += `&color=ilike.*${filters.color}*`;
+    }
+
+    if (filters.size) {
+      query += `&size=eq.${filters.size}`;
+    }
+
+    if (filters.category) {
+      query += `&category=eq.${filters.category}`;
+    }
+
+    if (filters.minPrice) {
+      query += `&price=gte.${filters.minPrice}`;
+    }
+
+    if (filters.maxPrice) {
+      query += `&price=lte.${filters.maxPrice}`;
+    }
+
+    // LIMIT results
+    query += `&limit=5`;
+
+    console.log("FINAL QUERY:", query);
+
+    const response = await fetch(query, {
       headers: {
-        apikey: process.env.SUPABASE_KEY,
-        Authorization: `Bearer ${process.env.SUPABASE_KEY}`,
-        "Content-Type": "application/json"
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`
       }
     });
 
@@ -55,11 +63,9 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("CRASH:", err);
-
+    console.error("ERROR:", err);
     return res.status(500).json({
-      error: err.message,
-      stack: err.stack
+      error: err.message
     });
   }
 }
