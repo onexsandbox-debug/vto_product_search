@@ -1,60 +1,27 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+)
+
 export default async function handler(req, res) {
   try {
     const { filters } = req.body;
 
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_KEY = process.env.SUPABASE_KEY;
+    let query = supabase.from('products').select('*');
 
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      return res.status(500).json({
-        error: "Missing Supabase environment variables"
-      });
-    }
+    if (filters.name) query = query.ilike('name', `%${filters.name}%`);
+    if (filters.gender) query = query.eq('gender_type', filters.gender);
+    if (filters.color) query = query.ilike('color', `%${filters.color}%`);
+    if (filters.size) query = query.eq('size', filters.size);
+    if (filters.category) query = query.eq('category', filters.category);
+    if (filters.minPrice) query = query.gte('price', filters.minPrice);
+    if (filters.maxPrice) query = query.lte('price', filters.maxPrice);
 
-    // Build query dynamically
-    let query = `${SUPABASE_URL}/rest/v1/products?select=*`;
+    const { data, error } = await query.limit(5);
 
-    if (filters.name) {
-      query += `&name=ilike.*${filters.name}*`;
-    }
-
-    if (filters.gender) {
-      query += `&gender_type=eq.${filters.gender}`;
-    }
-
-    if (filters.color) {
-      query += `&color=ilike.*${filters.color}*`;
-    }
-
-    if (filters.size) {
-      query += `&size=eq.${filters.size}`;
-    }
-
-    if (filters.category) {
-      query += `&category=eq.${filters.category}`;
-    }
-
-    if (filters.minPrice) {
-      query += `&price=gte.${filters.minPrice}`;
-    }
-
-    if (filters.maxPrice) {
-      query += `&price=lte.${filters.maxPrice}`;
-    }
-
-    // LIMIT results
-    query += `&limit=5`;
-
-    console.log("FINAL QUERY:", query);
-
-    const response = await fetch(query, {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`
-      }
-    });
-
-    const data = await response.json();
+    if (error) throw error;
 
     return res.status(200).json({
       success: true,
@@ -63,9 +30,6 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("ERROR:", err);
-    return res.status(500).json({
-      error: err.message
-    });
+    return res.status(500).json({ error: err.message });
   }
 }
