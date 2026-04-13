@@ -1,5 +1,3 @@
-import fetch from "node-fetch";
-
 export default async function handler(req, res) {
   try {
     const { filters } = req.body || {};
@@ -28,7 +26,6 @@ export default async function handler(req, res) {
     if (minPrice) query.push(`price=gte.${minPrice}`);
     if (maxPrice) query.push(`price=lte.${maxPrice}`);
 
-    // ✅ SAFE QUERY BUILD
     let url = `${process.env.SUPABASE_URL}/rest/v1/products`;
 
     if (query.length > 0) {
@@ -37,8 +34,9 @@ export default async function handler(req, res) {
       url += `?limit=5`;
     }
 
-    console.log("URL:", url); // 🔥 debug
+    console.log("URL:", url);
 
+    // ✅ USE NATIVE FETCH (IMPORTANT)
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -48,24 +46,7 @@ export default async function handler(req, res) {
       }
     });
 
-    const text = await response.text(); // safer than .json()
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      return res.status(500).json({
-        error: "Invalid JSON from Supabase",
-        raw: text
-      });
-    }
-
-    if (!response.ok) {
-      return res.status(500).json({
-        error: "Supabase error",
-        details: data
-      });
-    }
+    const data = await response.json();
 
     return res.status(200).json({
       success: true,
