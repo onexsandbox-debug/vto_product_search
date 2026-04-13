@@ -2,7 +2,11 @@ import fetch from "node-fetch";
 
 export default async function handler(req, res) {
   try {
-    const { filters } = req.body;
+    const { filters } = req.body || {};
+
+    if (!filters) {
+      return res.status(400).json({ error: "Filters missing" });
+    }
 
     const {
       name,
@@ -12,11 +16,10 @@ export default async function handler(req, res) {
       minPrice,
       maxPrice,
       category
-    } = filters || {};
+    } = filters;
 
     let query = [];
 
-    // ✅ Build filters dynamically
     if (name) query.push(`name=ilike.*${name}*`);
     if (gender) query.push(`gender_type=eq.${gender}`);
     if (color) query.push(`color=ilike.*${color}*`);
@@ -25,11 +28,16 @@ export default async function handler(req, res) {
     if (minPrice) query.push(`price=gte.${minPrice}`);
     if (maxPrice) query.push(`price=lte.${maxPrice}`);
 
-    const queryString = query.length ? `?${query.join("&")}` : "";
+    // ✅ SAFE QUERY BUILD
+    let url = `${process.env.SUPABASE_URL}/rest/v1/products`;
 
-    const url = `${process.env.SUPABASE_URL}/rest/v1/products${queryString}&limit=5`;
+    if (query.length > 0) {
+      url += `?${query.join("&")}&limit=5`;
+    } else {
+      url += `?limit=5`;
+    }
 
-    console.log("FINAL URL:", url); // 🔥 will help debug
+    console.log("URL:", url); // 🔥 debug
 
     const response = await fetch(url, {
       method: "GET",
@@ -40,7 +48,17 @@ export default async function handler(req, res) {
       }
     });
 
-    const data = await response.json();
+    const text = await response.text(); // safer than .json()
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return res.status(500).json({
+        error: "Invalid JSON from Supabase",
+        raw: text
+      });
+    }
 
     if (!response.ok) {
       return res.status(500).json({
@@ -49,16 +67,18 @@ export default async function handler(req, res) {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: data.length,
       products: data
     });
 
-  } catch (error) {
-    console.error("ERROR:", error);
-    res.status(500).json({
-      error: error.message
+  } catch (err) {
+    console.error("CRASH:", err);
+
+    return res.status(500).json({
+      error: err.message,
+      stack: err.stack
     });
   }
 }
