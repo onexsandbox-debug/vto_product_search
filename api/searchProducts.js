@@ -1,38 +1,64 @@
-import { createClient } from "@supabase/supabase-js";
+import fetch from "node-fetch";
 
 export default async function handler(req, res) {
   try {
-    console.log("ENV URL:", process.env.SUPABASE_URL);
-    console.log("ENV KEY:", process.env.SUPABASE_KEY ? "Present" : "Missing");
+    const { filters } = req.body;
 
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+    const {
+      name,
+      gender,
+      color,
+      size,
+      minPrice,
+      maxPrice,
+      category
+    } = filters || {};
+
+    let query = [];
+
+    // ✅ Build filters dynamically
+    if (name) query.push(`name=ilike.*${name}*`);
+    if (gender) query.push(`gender_type=eq.${gender}`);
+    if (color) query.push(`color=ilike.*${color}*`);
+    if (size) query.push(`size=eq.${size}`);
+    if (category) query.push(`category=eq.${category}`);
+    if (minPrice) query.push(`price=gte.${minPrice}`);
+    if (maxPrice) query.push(`price=lte.${maxPrice}`);
+
+    const queryString = query.length ? `?${query.join("&")}` : "";
+
+    const url = `${process.env.SUPABASE_URL}/rest/v1/products${queryString}&limit=5`;
+
+    console.log("FINAL URL:", url); // 🔥 will help debug
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        apikey: process.env.SUPABASE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
       return res.status(500).json({
-        error: "ENV variables missing"
+        error: "Supabase error",
+        details: data
       });
     }
 
-    const supabase = createClient(
-      process.env.SUPABASE_URL.trim(),
-      process.env.SUPABASE_KEY.trim()
-    );
-
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .limit(1);
-
-    if (error) {
-      return res.status(500).json({ error });
-    }
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      data
+      count: data.length,
+      products: data
     });
 
-  } catch (err) {
-    return res.status(500).json({
-      error: err.message
+  } catch (error) {
+    console.error("ERROR:", error);
+    res.status(500).json({
+      error: error.message
     });
   }
 }
