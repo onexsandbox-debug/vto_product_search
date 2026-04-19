@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// 🔍 ENV DEBUG (runs on cold start)
+// 🔍 ENV DEBUG
 console.log("INIT: SUPABASE_URL =", process.env.SUPABASE_URL);
 console.log(
   "INIT: SUPABASE_ANON_KEY =",
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       query = query.ilike('name', `%${filters.name.trim()}%`);
     }
 
-    // 👩 Gender (STRICT + lowercase match)
+    // 👩 Gender
     if (filters.gender?.trim()) {
       query = query.eq('gender_type', filters.gender.trim().toLowerCase());
     }
@@ -73,9 +73,13 @@ export default async function handler(req, res) {
       query = query.gte('popularity', filters.popularity);
     }
 
-    // 👕 Size (JSON array contains)
+    // 👕 Size (FIXED — JSONB safe)
     if (filters.size?.trim()) {
-      query = query.contains('available_sizes', [filters.size.trim()]);
+      query = query.filter(
+        'available_sizes',
+        'cs', // contains
+        `["${filters.size.trim()}"]`
+      );
     }
 
     console.log("Executing query with filters...");
