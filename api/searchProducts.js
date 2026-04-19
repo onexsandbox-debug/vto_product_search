@@ -13,6 +13,17 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+// 🔧 Utility: validate input
+const isValid = (val) => {
+  return (
+    val !== undefined &&
+    val !== null &&
+    val !== "null" &&
+    val !== "" &&
+    !(typeof val === "string" && val.trim() === "")
+  );
+};
+
 export default async function handler(req, res) {
   console.log("---- API INVOKED ----");
   console.log("Method:", req.method);
@@ -36,53 +47,50 @@ export default async function handler(req, res) {
     let query = supabase.from('products').select('*');
 
     // =========================
-    // APPLY FILTERS (STRICT)
+    // APPLY FILTERS (SAFE)
     // =========================
 
-    // 🔍 Name search
-    if (filters.name?.trim()) {
+    // 🔍 Name search (fuzzy)
+    if (isValid(filters.name)) {
       query = query.ilike('name', `%${filters.name.trim()}%`);
     }
 
     // 👩 Gender
-    if (filters.gender?.trim()) {
+    if (isValid(filters.gender)) {
       query = query.eq('gender_type', filters.gender.trim().toLowerCase());
     }
 
     // 🎨 Color
-    if (filters.color?.trim()) {
+    if (isValid(filters.color)) {
       query = query.eq('color', filters.color.trim().toLowerCase());
     }
 
     // 📦 Category
-    if (filters.category?.trim()) {
+    if (isValid(filters.category)) {
       query = query.eq('category', filters.category.trim().toLowerCase());
     }
 
     // 💰 Price range
-    if (filters.minPrice !== undefined && filters.minPrice !== null) {
+    if (isValid(filters.minPrice)) {
       query = query.gte('price', filters.minPrice);
     }
 
-    if (filters.maxPrice !== undefined && filters.maxPrice !== null) {
+    if (isValid(filters.maxPrice)) {
       query = query.lte('price', filters.maxPrice);
     }
 
     // ⭐ Popularity
-    if (filters.popularity !== undefined && filters.popularity !== null) {
+    if (isValid(filters.popularity)) {
       query = query.gte('popularity', filters.popularity);
     }
 
-    // 👕 Size (FIXED — JSONB safe)
-    if (filters.size?.trim()) {
-      query = query.filter(
-        'available_sizes',
-        'cs', // contains
-        `["${filters.size.trim()}"]`
-      );
-    }
+    // ❌ SIZE FILTER REMOVED (as per your requirement)
+    // We DO NOT filter by size anymore
 
-    console.log("Executing query with filters...");
+    console.log("Executing query...");
+
+    // 🔥 Sorting (best practice)
+    query = query.order('popularity', { ascending: false });
 
     // Execute query
     const { data, error } = await query.limit(20);
@@ -97,6 +105,10 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       count: data.length,
+      filtersApplied: {
+        ...filters,
+        size: "ignored (returned in results only)"
+      },
       data
     });
 
